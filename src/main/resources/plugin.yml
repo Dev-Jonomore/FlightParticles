@@ -1,0 +1,10 @@
+name: FlightParticles
+description: $description
+prefix: Fly
+version: '${version}'
+
+main: mc.jonomore.flightParticles.FlightParticles
+api-version: '26.1.2'
+load: POSTWORLD
+
+authors: [ Jonomore ]
