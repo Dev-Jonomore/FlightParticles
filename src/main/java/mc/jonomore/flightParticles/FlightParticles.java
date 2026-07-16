@@ -20,6 +20,7 @@ import org.bukkit.util.Vector;
 public final class FlightParticles extends JavaPlugin {
 
   public static final String FLIGHT_PERMISSION = "lobby.flight";
+  public static final String FLIGHT_COMMAND_PERMISSION = "flight.command";
 
   private static final UUID NIT1KING = UUID.fromString("b96e4a52-a359-4f33-8a81-bc6236f321b8");
   private static final Color PLUM_COLOR = Color.fromRGB(110, 41, 112);
@@ -30,7 +31,7 @@ public final class FlightParticles extends JavaPlugin {
 
   @FlightPermission
   public static boolean mayRun(CommandSourceStack source) {
-    return source.getSender().hasPermission(FLIGHT_PERMISSION);
+    return source.getSender().hasPermission(FLIGHT_COMMAND_PERMISSION);
   }
 
   @Override

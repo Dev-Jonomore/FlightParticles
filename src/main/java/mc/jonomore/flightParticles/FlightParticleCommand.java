@@ -1,17 +1,20 @@
 package mc.jonomore.flightParticles;
 
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import net.strokkur.commands.Aliases;
-import net.strokkur.commands.Command;
-import net.strokkur.commands.Executes;
-import net.strokkur.commands.Literal;
+import net.strokkur.commands.*;
 import net.strokkur.commands.paper.Description;
 import net.strokkur.commands.paper.Executor;
 import org.bukkit.entity.Player;
 
+import java.util.concurrent.CompletableFuture;
+
 @Command("flightparticle")
-@Aliases({ "fp", "particles", "particle" })
-@Description("Choose your flight trail particle")
+@Aliases({ "fp", "particles", "particle", "flightperms" })
+@Description("Choose and customize your flight trail particle")
 @FlightPermission
 public final class FlightParticleCommand {
 
@@ -24,17 +27,34 @@ public final class FlightParticleCommand {
   @Executes
   void showCurrent(@Executor Player player) {
     FlightParticleType type = plugin.getPlayerParticleType(player);
+    StringBuilder options = new StringBuilder();
+    for (FlightParticleType pType : FlightParticleType.allowedFor(player)) {
+      options.append(", ").append(pType.literal());
+    }
     player.sendRichMessage(
-        "<gray>Your flight trail particle: <white><type><gray>. Options: dust, flame, spark, soul, ehit, crit, ash, dragon",
-        Placeholder.unparsed("type", type.displayName()));
+      "<dark_purple>Your flight trail particle: <b><type></b>. Options: <yellow>dust<options>",
+      Placeholder.unparsed("type", type.displayName()),
+      Placeholder.unparsed("options", options.toString()));
+  }
+
+  @ParticleSuggestions
+  public static CompletableFuture<Suggestions> provide(CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
+    FlightParticleType.allowedFor(ctx.getSource().getSender()).stream()
+      .map(FlightParticleType::literal)
+      .forEach(builder::suggest);
+    return builder.buildFuture();
   }
 
   @Executes("set")
-  void setParticle(@Executor Player player, @Literal({ "dust", "flame", "spark", "soul", "ehit", "crit", "ash", "dragon" }) String particle) {
+  void setParticle(@Executor Player player, @ParticleSuggestions String particle) {
     FlightParticleType type = FlightParticleType.fromLiteral(particle);
+    if (type == null || !type.isAllowed(player)) {
+      player.sendRichMessage("<red>This particle is locked!");
+      return;
+    }
     plugin.setPlayerParticleType(player, type);
     player.sendRichMessage(
-        "<green>Flight trail particle set to <white><type><green>!",
+        "<green>Flight trail particle set to <dark_purple><b><type><green>!",
         Placeholder.unparsed("type", type.displayName()));
   }
 
@@ -43,7 +63,7 @@ public final class FlightParticleCommand {
     FlightParticleType type = FlightParticleType.fromLiteral("dust");
     plugin.setPlayerParticleType(player, type);
     player.sendRichMessage(
-      "<green>Flight trail particle set to <white><type><green>!",
+      "<green>Flight trail particle set to <dark_purple><b><type><green>!",
       Placeholder.unparsed("type", type.displayName()));
   }
 }
