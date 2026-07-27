@@ -8,6 +8,8 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.strokkur.commands.*;
 import net.strokkur.commands.paper.Description;
 import net.strokkur.commands.paper.Executor;
+import net.strokkur.commands.permission.Permission;
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.concurrent.CompletableFuture;
@@ -58,12 +60,25 @@ public final class FlightParticleCommand {
         Placeholder.unparsed("type", type.displayName()));
   }
 
-  @Executes("reset")
-  void resetParticle(@Executor Player player) {
-    FlightParticleType type = FlightParticleType.fromLiteral("dust");
-    plugin.setPlayerParticleType(player, type);
-    player.sendRichMessage(
-      "<green>Flight trail particle set to <dark_purple><b><type><green>!",
-      Placeholder.unparsed("type", type.displayName()));
+  @Subcommand("reset")
+  class ResetSub {
+
+    @Executes
+    void resetParticle(@Executor Player player) {
+      FlightParticleType type = FlightParticleType.fromLiteral("dust");
+      plugin.setPlayerParticleType(player, type);
+      player.sendRichMessage(
+        "<green>Flight trail particle set to <dark_purple><b><type><green>!",
+        Placeholder.unparsed("type", type.displayName()));
+    }
+
+    @Executes("--all")
+    @Permission(FlightParticles.RESET_ALL_PERMISSION)
+    void resetAllParticles(CommandSender sender) {
+      int reset = plugin.resetUnpermittedParticles();
+      sender.sendRichMessage(
+        "<green>Reset <yellow><count><green> online player(s) whose particle is no longer permitted.",
+        Placeholder.unparsed("count", String.valueOf(reset)));
+    }
   }
 }

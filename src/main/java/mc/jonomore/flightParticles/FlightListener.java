@@ -29,16 +29,12 @@ public final class FlightListener implements Listener {
 
   @EventHandler
   public void onPlayerJoin(PlayerJoinEvent event) {
-    if (event.getPlayer().hasPermission(FlightParticles.FLIGHT_PERMISSION)) {
-      event.getPlayer().setAllowFlight(true);
-    }
+    plugin.applyFlightPermission(event.getPlayer());
   }
 
   @EventHandler
   public void onPlayerPostRespawn(PlayerPostRespawnEvent event) {
-    if (event.getPlayer().hasPermission(FlightParticles.FLIGHT_PERMISSION)) {
-      event.getPlayer().setAllowFlight(true);
-    }
+    plugin.applyFlightPermission(event.getPlayer());
   }
 
   @EventHandler

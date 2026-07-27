@@ -14,6 +14,7 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.1.2.build.+")
+    compileOnly("net.luckperms:api:5.5")
     compileOnly("net.strokkur.commands:annotations-paper:2.1.4")
     annotationProcessor("net.strokkur.commands:processor-paper:2.1.4")
 }

@@ -3,17 +3,18 @@ package mc.jonomore.flightParticles;
 import com.destroystokyo.paper.ParticleBuilder;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
-import org.bukkit.Bukkit;
-import org.bukkit.Color;
-import org.bukkit.Location;
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.event.user.UserDataRecalculateEvent;
+import org.bukkit.*;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import org.bukkit.NamespacedKey;
+
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Vector;
 
@@ -21,6 +22,7 @@ public final class FlightParticles extends JavaPlugin {
 
   public static final String FLIGHT_PERMISSION = "lobby.flight";
   public static final String FLIGHT_COMMAND_PERMISSION = "flight.command";
+  public static final String RESET_ALL_PERMISSION = "flight.command.resetall";
 
   private static final UUID NIT1KING = UUID.fromString("b96e4a52-a359-4f33-8a81-bc6236f321b8");
   private static final Color PLUM_COLOR = Color.fromRGB(110, 41, 112);
@@ -43,6 +45,39 @@ public final class FlightParticles extends JavaPlugin {
   @Override
   public void onEnable() {
     getServer().getPluginManager().registerEvents(new FlightListener(this), this);
+    subscribeToPermissionChanges();
+  }
+
+  /** Syncs allowFlight with {@link #FLIGHT_PERMISSION}; creative and spectator manage flight themselves. */
+  void applyFlightPermission(Player player) {
+    GameMode mode = player.getGameMode();
+    if (mode == GameMode.CREATIVE || mode == GameMode.SPECTATOR) {
+      return;
+    }
+    boolean allowed = player.hasPermission(FLIGHT_PERMISSION);
+    if (player.getAllowFlight() != allowed) {
+      player.setAllowFlight(allowed);
+    }
+  }
+
+  private void subscribeToPermissionChanges() {
+    RegisteredServiceProvider<LuckPerms> provider = getServer().getServicesManager().getRegistration(LuckPerms.class);
+    if (provider == null) {
+      getLogger().warning("LuckPerms not found — flight permission changes will only apply on join or respawn.");
+      return;
+    }
+
+    // Recalculate rather than node-mutate, so group and inheritance changes are covered too.
+    provider.getProvider().getEventBus().subscribe(this, UserDataRecalculateEvent.class, event -> {
+      UUID uuid = event.getUser().getUniqueId();
+      // LuckPerms fires this off the main thread; flight state must not be touched there.
+      getServer().getScheduler().runTask(this, () -> {
+        Player player = Bukkit.getPlayer(uuid);
+        if (player != null) {
+          applyFlightPermission(player);
+        }
+      });
+    });
   }
 
   void onPlayerStartFlying(UUID uuid) {
@@ -57,19 +92,43 @@ public final class FlightParticles extends JavaPlugin {
   }
 
   FlightParticleType getPlayerParticleType(Player player) {
-    String literal = player.getPersistentDataContainer().get(particleKey, PersistentDataType.STRING);
-    if (literal == null) {
-      return FlightParticleType.DUST;
-    }
-    try {
-      return FlightParticleType.fromLiteral(literal);
-    } catch (IllegalArgumentException _) {
-      return FlightParticleType.DUST;
-    }
+    FlightParticleType type = getStoredParticleType(player);
+    // A stored type the player no longer has permission for is not honored.
+    return type != null && type.isAllowed(player) ? type : FlightParticleType.DUST;
   }
 
   void setPlayerParticleType(Player player, FlightParticleType type) {
     player.getPersistentDataContainer().set(particleKey, PersistentDataType.STRING, type.literal());
+  }
+
+  /** Clears the stored particle of every online player who may no longer use it, returning the count. */
+  int resetUnpermittedParticles() {
+    int reset = 0;
+    for (Player player : Bukkit.getOnlinePlayers()) {
+      if (!player.getPersistentDataContainer().has(particleKey, PersistentDataType.STRING)) {
+        continue;
+      }
+      FlightParticleType type = getStoredParticleType(player);
+      if (type != null && type.isAllowed(player)) {
+        continue;
+      }
+      player.getPersistentDataContainer().remove(particleKey);
+      reset++;
+    }
+    return reset;
+  }
+
+  /** The persisted particle, or null when absent or no longer a known type. */
+  private FlightParticleType getStoredParticleType(Player player) {
+    String literal = player.getPersistentDataContainer().get(particleKey, PersistentDataType.STRING);
+    if (literal == null) {
+      return null;
+    }
+    try {
+      return FlightParticleType.fromLiteral(literal);
+    } catch (IllegalArgumentException _) {
+      return null;
+    }
   }
 
   /**
@@ -88,6 +147,11 @@ public final class FlightParticles extends JavaPlugin {
         // Validation check to prune invalid or un-tracked player states
         if (player == null || !player.isOnline() || !player.isFlying()) {
           flyingPlayers.remove(uuid);
+          continue;
+        }
+
+        // Spectators stay tracked so the trail resumes when they leave the gamemode.
+        if (player.getGameMode() == GameMode.SPECTATOR) {
           continue;
         }
 
