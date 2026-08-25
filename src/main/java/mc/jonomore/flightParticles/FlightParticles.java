@@ -39,7 +39,11 @@ public final class FlightParticles extends JavaPlugin {
   @Override
   public void onLoad() {
     getLifecycleManager().registerEventHandler(
-        LifecycleEvents.COMMANDS.newHandler(event -> FlightParticleCommandBrigadier.register(event.registrar(), this)));
+        LifecycleEvents.COMMANDS.newHandler(event -> {
+          FlightParticleCommandBrigadier.register(event.registrar(), this);
+          FlyCommandBrigadier.register(event.registrar());
+        })
+    );
   }
 
   @Override

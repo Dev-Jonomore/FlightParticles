@@ -2,6 +2,7 @@ package mc.jonomore.flightParticles;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import com.destroystokyo.paper.event.player.PlayerPostRespawnEvent;
@@ -32,7 +33,7 @@ public final class FlightListener implements Listener {
     plugin.applyFlightPermission(event.getPlayer());
   }
 
-  @EventHandler
+  @EventHandler(priority = EventPriority.MONITOR)
   public void onPlayerPostRespawn(PlayerPostRespawnEvent event) {
     plugin.applyFlightPermission(event.getPlayer());
   }
