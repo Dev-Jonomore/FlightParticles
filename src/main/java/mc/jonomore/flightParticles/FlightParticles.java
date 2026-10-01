@@ -25,6 +25,7 @@ public final class FlightParticles extends JavaPlugin {
   public static final String SETTINGS_PERMISSION = "flight.settings";
 
   private final ParticleStorage storage = new ParticleStorage(this);
+  private ParticleRegistry particles;
   private final Set<UUID> flyingPlayers = ConcurrentHashMap.newKeySet();
   private BukkitTask globalTask = null;
 
@@ -45,12 +46,18 @@ public final class FlightParticles extends JavaPlugin {
 
   @Override
   public void onEnable() {
+    saveDefaultConfig();
+    particles = ParticleRegistry.load(this);
     getServer().getPluginManager().registerEvents(new FlightListener(this), this);
     subscribeToPermissionChanges();
   }
 
   public ParticleStorage storage() {
     return storage;
+  }
+
+  public ParticleRegistry particles() {
+    return particles;
   }
 
   /** Syncs allowFlight with {@link #FLIGHT_PERMISSION}; creative and spectator manage flight themselves. */
@@ -104,7 +111,7 @@ public final class FlightParticles extends JavaPlugin {
    */
   ParticleStorage.Selection getEffectiveSelection(Player player) {
     ParticleStorage.Selection selection = storage.getSelection(player);
-    FlightParticleType type = selection.type().isAllowed(player) ? selection.type() : FlightParticleType.DUST;
+    FlightParticleType type = selection.type().isAllowed(player) ? selection.type() : particles.defaultType();
     boolean custom = selection.custom()
         && type == selection.type()
         && player.hasPermission(SETTINGS_PERMISSION);
@@ -127,7 +134,7 @@ public final class FlightParticles extends JavaPlugin {
         continue;
       }
       // Only the selection is walked back; saved settings survive.
-      storage.selectPreset(player, FlightParticleType.DUST);
+      storage.selectPreset(player, particles.defaultType());
       reset++;
     }
     return reset;
@@ -197,15 +204,10 @@ public final class FlightParticles extends JavaPlugin {
    * the player's velocity every tick.
    */
   private void applyDynamicDefault(Player player, FlightParticleType type, ParticleBuilder builder) {
-    switch (type) {
-      case CRIT, ENCHANTED_HIT -> {
-        Vector velocity = player.getVelocity().clone().multiply(-1);
-        builder
-          .offset(velocity.getX(), -0.1, velocity.getZ())
-          .count(0);
-      }
-      default -> throw new IllegalStateException("No dynamic default for " + type);
-    }
+    Vector velocity = player.getVelocity().clone().multiply(-1);
+    builder
+      .offset(velocity.getX(), -0.1, velocity.getZ())
+      .count(0);
   }
 
   private static void applySettings(FlightParticleType type, ParticleSettings settings, ParticleBuilder builder) {
@@ -214,11 +216,11 @@ public final class FlightParticles extends JavaPlugin {
       .count(settings.count())
       .extra(settings.speed());
 
-    if (type == FlightParticleType.DUST) {
+    if (type.hasColor()) {
       builder.color(settings.color(), settings.size());
-    } else if (type == FlightParticleType.DRAGON_BREATH) {
+    } else if (type.data() != null) {
       // A fixed characteristic of this trail rather than a tunable, so both modes get it.
-      builder.data(0.5f);
+      builder.data(type.data());
     }
   }
 

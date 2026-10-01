@@ -4,10 +4,6 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
-import org.bukkit.plugin.Plugin;
-
-import java.util.EnumMap;
-import java.util.Map;
 
 /**
  * Reads and writes the player's trail choice and per-particle settings.
@@ -25,16 +21,8 @@ public final class ParticleStorage {
 
   /**
    * What the player picked, before permissions are applied.
-   *
-   * <p>Immutable, so {@link #DEFAULT} can be a shared constant and a value handed
-   * out by {@link #getSelection} can never be mistaken for a live handle onto
-   * stored state. To change one field and keep the rest, use a wither -- or
-   * better, one of the intent-named mutators on the enclosing class, which write
-   * through to the PDC.
    */
   public record Selection(FlightParticleType type, boolean custom, boolean enabled) {
-    public static final Selection DEFAULT = new Selection(FlightParticleType.DUST, false, true);
-
     public Selection withType(FlightParticleType type) {
       return new Selection(type, custom, enabled);
     }
@@ -50,6 +38,7 @@ public final class ParticleStorage {
 
   private static final int SCHEMA = 1;
 
+  private final FlightParticles plugin;
   private final NamespacedKey selectionKey;
   private final NamespacedKey settingsKey;
   /** Pre-container format: a bare particle literal under the original key. */
@@ -68,9 +57,8 @@ public final class ParticleStorage {
   private final NamespacedKey rgbKey;
   private final NamespacedKey sizeKey;
 
-  private final Map<FlightParticleType, NamespacedKey> typeKeys = new EnumMap<>(FlightParticleType.class);
-
-  public ParticleStorage(Plugin plugin) {
+  public ParticleStorage(FlightParticles plugin) {
+    this.plugin = plugin;
     selectionKey = new NamespacedKey(plugin, "selection");
     settingsKey = new NamespacedKey(plugin, "settings");
     legacyKey = new NamespacedKey(plugin, "flight_particle");
@@ -87,10 +75,15 @@ public final class ParticleStorage {
     speedKey = new NamespacedKey(plugin, "speed");
     rgbKey = new NamespacedKey(plugin, "rgb");
     sizeKey = new NamespacedKey(plugin, "size");
+  }
 
-    for (FlightParticleType type : FlightParticleType.values()) {
-      typeKeys.put(type, new NamespacedKey(plugin, type.literal()));
-    }
+  /** A fresh selection of the configured default trail, for players with nothing (usable) stored. */
+  private Selection defaultSelection() {
+    return new Selection(plugin.particles().defaultType(), false, true);
+  }
+
+  private NamespacedKey typeKey(FlightParticleType type) {
+    return new NamespacedKey(plugin, type.literal());
   }
 
   public Selection getSelection(Player player) {
@@ -102,7 +95,7 @@ public final class ParticleStorage {
 
     FlightParticleType type = parseType(stored.get(idKey, PersistentDataType.STRING));
     if (type == null) {
-      return Selection.DEFAULT;
+      return defaultSelection();
     }
     return new Selection(
       type,
@@ -172,12 +165,12 @@ public final class ParticleStorage {
     one.set(countKey, PersistentDataType.INTEGER, settings.count());
     one.set(speedKey, PersistentDataType.FLOAT, settings.speed());
     // Only Dust reads these; writing them everywhere would just be noise in the NBT.
-    if (type == FlightParticleType.DUST) {
+    if (type.hasColor()) {
       one.set(rgbKey, PersistentDataType.INTEGER, settings.rgb());
       one.set(sizeKey, PersistentDataType.FLOAT, settings.size());
     }
 
-    all.set(typeKeys.get(type), PersistentDataType.TAG_CONTAINER, one);
+    all.set(typeKey(type), PersistentDataType.TAG_CONTAINER, one);
     root.set(settingsKey, PersistentDataType.TAG_CONTAINER, all);
   }
 
@@ -187,7 +180,7 @@ public final class ParticleStorage {
     if (all == null) {
       return;
     }
-    all.remove(typeKeys.get(type));
+    all.remove(typeKey(type));
     root.set(settingsKey, PersistentDataType.TAG_CONTAINER, all);
   }
 
@@ -203,24 +196,17 @@ public final class ParticleStorage {
 
   private Selection legacySelection(PersistentDataContainer root) {
     FlightParticleType type = parseType(root.get(legacyKey, PersistentDataType.STRING));
-    return type == null ? Selection.DEFAULT : new Selection(type, false, true);
+    return type == null ? defaultSelection() : new Selection(type, false, true);
   }
 
   private PersistentDataContainer settingsFor(Player player, FlightParticleType type) {
     PersistentDataContainer all =
       player.getPersistentDataContainer().get(settingsKey, PersistentDataType.TAG_CONTAINER);
-    return all == null ? null : all.get(typeKeys.get(type), PersistentDataType.TAG_CONTAINER);
+    return all == null ? null : all.get(typeKey(type), PersistentDataType.TAG_CONTAINER);
   }
 
   /** Null for absent or no longer known literals; both mean "fall back". */
-  private static FlightParticleType parseType(String literal) {
-    if (literal == null) {
-      return null;
-    }
-    try {
-      return FlightParticleType.fromLiteral(literal);
-    } catch (IllegalArgumentException _) {
-      return null;
-    }
+  private FlightParticleType parseType(String literal) {
+    return plugin.particles().get(literal);
   }
 }

@@ -11,6 +11,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.entity.Player;
+import org.jspecify.annotations.NonNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +25,6 @@ import java.util.List;
  * with the switch on hands off to {@link ParticleDialogs}, whose exit action
  * comes back here.
  */
-@SuppressWarnings("UnstableApiUsage")
 public final class ParticleMenuDialog {
 
   private static final String CUSTOM_KEY = "custom";
@@ -38,16 +38,8 @@ public final class ParticleMenuDialog {
     boolean canCustomize = p.hasPermission(FlightParticles.SETTINGS_PERMISSION);
 
     // Mirrors the renderer: a trail whose permission was revoked draws as Dust.
-    FlightParticleType current = selection.type().isAllowed(p) ? selection.type() : FlightParticleType.DUST;
-    boolean tuned = selection.custom() && canCustomize;
-
-    List<DialogBody> body = List.of(DialogBody.plainMessage(
-      Component.text("Current particle: ", NamedTextColor.GRAY)
-        .append(Component.text(current.displayName() + (tuned ? " (Custom)" : ""), NamedTextColor.YELLOW))
-        .append(Component.text(" — Trail is ", NamedTextColor.GRAY))
-        .append(selection.enabled()
-          ? Component.text("visible", NamedTextColor.GREEN)
-          : Component.text("hidden", NamedTextColor.RED))));
+    FlightParticleType current = selection.type().isAllowed(p) ? selection.type() : plugin.particles().defaultType();
+    List<DialogBody> body = getBodyLines(selection, canCustomize, current);
 
     // A boolean input can be neither disabled nor colored per option, so a locked
     // switch is marked red and its value is ignored in the callback instead.
@@ -55,15 +47,15 @@ public final class ParticleMenuDialog {
       canCustomize ? NamedTextColor.WHITE : NamedTextColor.RED);
 
     List<ActionButton> actions = new ArrayList<>();
-    for (FlightParticleType type : FlightParticleType.values()) {
+    for (FlightParticleType type : plugin.particles().values()) {
       actions.add(particleButton(plugin, p, type, storage.hasCustomSettings(p, type)));
     }
 
     actions.add(ActionButton.builder(Component.text("Reset Trail", NamedTextColor.RED))
-      .tooltip(Component.text("Go back to the default Dust trail."))
+      .tooltip(Component.text("Go back to the default trail."))
       .width(BUTTON_WIDTH)
       .action(DialogAction.customClick(
-        (view, audience) -> choose(plugin, p, FlightParticleType.DUST, false),
+        (_, _) -> choose(plugin, p, plugin.particles().defaultType(), false),
         ParticleDialogs.CALLBACK_OPTIONS))
       .build());
 
@@ -74,7 +66,7 @@ public final class ParticleMenuDialog {
       .tooltip(Component.text(enabled ? "Stop showing your flight trail." : "Show your flight trail again."))
       .width(BUTTON_WIDTH)
       .action(DialogAction.customClick(
-        (view, audience) -> {
+        (_, _) -> {
           // Read back rather than trusting the click: a stale dialog may show the old state.
           ParticleStorage fresh = plugin.storage();
           fresh.setEnabled(p, !fresh.getSelection(p).enabled());
@@ -98,12 +90,24 @@ public final class ParticleMenuDialog {
     p.showDialog(dialog);
   }
 
+  private static @NonNull List<DialogBody> getBodyLines(ParticleStorage.Selection selection, boolean canCustomize, FlightParticleType current) {
+    boolean tuned = selection.custom() && canCustomize;
+
+    return List.of(DialogBody.plainMessage(
+      Component.text("Current particle: ", NamedTextColor.GRAY)
+        .append(Component.text(current.displayName() + (tuned ? " (Custom)" : ""), NamedTextColor.YELLOW))
+        .append(Component.text(" — Trail is ", NamedTextColor.GRAY))
+        .append(selection.enabled()
+          ? Component.text("visible", NamedTextColor.GREEN)
+          : Component.text("hidden", NamedTextColor.RED))));
+  }
+
   private static ActionButton particleButton(
       FlightParticles plugin, Player p, FlightParticleType type, boolean hasCustom) {
 
     boolean allowed = type.isAllowed(p);
     Component label = Component.text(
-      (type == FlightParticleType.DUST ? type.displayName() + " (Default)" : type.displayName())
+      (type == plugin.particles().defaultType() ? type.displayName() + " (Default)" : type.displayName())
         + (hasCustom ? " *" : ""),
       allowed ? NamedTextColor.WHITE : NamedTextColor.RED);
 
@@ -115,7 +119,7 @@ public final class ParticleMenuDialog {
       .tooltip(tooltip)
       .width(BUTTON_WIDTH)
       .action(DialogAction.customClick(
-        (view, audience) -> onParticleClick(plugin, p, type, view),
+        (view, _) -> onParticleClick(plugin, p, type, view),
         ParticleDialogs.CALLBACK_OPTIONS))
       .build();
   }

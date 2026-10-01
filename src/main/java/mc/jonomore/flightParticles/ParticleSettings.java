@@ -52,7 +52,7 @@ public record ParticleSettings(
     return new ParticleSettings(offsetX, offsetY, offsetZ, count, speed, INERT_RGB, INERT_SIZE);
   }
 
-  /** Settings for {@link FlightParticleType#DUST}, the only type with a data object. */
+  /** Settings for Dust, the only type with a color and size. */
   public static ParticleSettings dust(
       double offsetX, double offsetY, double offsetZ, int count, float speed, int rgb, float size) {
     return new ParticleSettings(offsetX, offsetY, offsetZ, count, speed, rgb, size);

@@ -11,7 +11,6 @@ import io.papermc.paper.registry.data.dialog.type.DialogType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickCallback;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.entity.Player;
 
@@ -24,15 +23,14 @@ import java.util.function.Consumer;
 /**
  * The per-particle settings screens.
  *
- * <p>Seven of the ten types share an identical shape -- three spread sliders, a
- * count, and a speed -- because only Dust carries a data object. Dust adds a
- * color and a size, so there is one builder here rather than ten dialogs.
+ * <p>Every type shares an identical shape -- three spread sliders, a count, and
+ * a speed -- except Dust, which carries a data object and adds a color and a
+ * size, so there is one builder here rather than a dialog per particle.
  *
  * <p>Nothing is persisted until the player accepts. A dialog cannot mutate
  * itself, so "reset" and a rejected color both work by closing and re-showing
  * with different seed values.
  */
-@SuppressWarnings("UnstableApiUsage")
 public final class ParticleDialogs {
 
   private static final int BUTTON_WIDTH = 150;
@@ -70,7 +68,7 @@ public final class ParticleDialogs {
     List<DialogInput> inputs = new ArrayList<>(DialogHelper.offsetInputs(settings));
     inputs.add(DialogHelper.countInput(settings.count()));
     inputs.add(DialogHelper.speedInput(settings.speed()));
-    if (type == FlightParticleType.DUST) {
+    if (type.hasColor()) {
       inputs.add(DialogHelper.colorInput(rawColor != null ? rawColor : HexColor.format(settings.rgb())));
       inputs.add(DialogHelper.sizeInput(settings.size()));
     }
@@ -79,7 +77,7 @@ public final class ParticleDialogs {
       .tooltip(Component.text("Reset to the original default settings."))
       .width(BUTTON_WIDTH)
       .action(DialogAction.customClick(
-        (view, audience) -> reopen(plugin, player, type, type.defaultSettings(), null, null, onExit),
+        (_, _) -> reopen(plugin, player, type, type.defaultSettings(), null, null, onExit),
         CALLBACK_OPTIONS))
       .build();
 
@@ -87,7 +85,7 @@ public final class ParticleDialogs {
       .tooltip(Component.text("Save these values and switch your trail to them."))
       .width(BUTTON_WIDTH)
       .action(DialogAction.customClick(
-        (view, audience) -> accept(plugin, player, type, settings, view, onExit),
+        (view, _) -> accept(plugin, player, type, settings, view, onExit),
         CALLBACK_OPTIONS))
       .build();
 
@@ -95,7 +93,7 @@ public final class ParticleDialogs {
       .tooltip(Component.text("Discard these changes and go back."))
       .width(BUTTON_WIDTH)
       .action(DialogAction.customClick(
-        (view, audience) -> plugin.getServer().getScheduler().runTask(plugin, () -> onExit.accept(player)),
+        (_, _) -> plugin.getServer().getScheduler().runTask(plugin, () -> onExit.accept(player)),
         CALLBACK_OPTIONS))
       .build();
 
@@ -134,7 +132,7 @@ public final class ParticleDialogs {
     ParticleSettings submitted = readNumbers(view, seed);
 
     int rgb = seed.rgb();
-    if (type == FlightParticleType.DUST) {
+    if (type.hasColor()) {
       String raw = view.getText(DialogHelper.COLOR_KEY);
       OptionalInt parsed = HexColor.parse(raw);
       if (parsed.isEmpty()) {
