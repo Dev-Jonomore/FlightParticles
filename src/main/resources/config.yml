@@ -1,0 +1,100 @@
+# Every flight trail offered in the menu, in menu order.
+#
+# Each entry is keyed by its id, which is what /fp set <id> takes and what is
+# stored on players. Changing or removing an id sends players on it back to
+# the default particle. Restart the server to apply changes.
+#
+#   name:           Shown in the menu and messages.
+#   particle:       Bukkit particle name, e.g. FLAME, ELECTRIC_SPARK, END_ROD.
+#                   Particles that need block/item/color data cannot be used,
+#                   apart from DUST (color and size) and DRAGON_BREATH (data).
+#   permission:     Node needed to use it. Defaults to flight.particle.<id>;
+#                   "none" lets everyone use it.
+#   data:           The float some particles take as data. Required for
+#                   DRAGON_BREATH, rejected for everything else.
+#   velocity-trail: Stream the stock trail behind the player's motion instead of
+#                   drawing it from settings (like Crit). Customized settings
+#                   still apply once a player tunes it.
+#   settings:       The stock values, and where the customizer starts.
+#                     offset.x/y/z   -2.0 to 2.0  spread (direction when count is 0)
+#                     count          0 to 8
+#                     speed          0.0 to 2.0
+#                     color, size    DUST only; hex color and 0.1 to 4.0
+
+# Where new players start, and what a locked or removed particle falls back to.
+# It never needs a permission.
+default-particle: dust
+
+particles:
+  dust:
+    name: Dust
+    particle: DUST
+    permission: none
+    settings:
+      offset: { x: 0.2, y: 0.0, z: 0.2 }
+      count: 1
+      speed: 1.0
+      color: "#6E2970"
+      size: 1.2
+  flame:
+    name: Flame
+    particle: FLAME
+    settings:
+      offset: { x: 0.15, y: 0.1, z: 0.15 }
+  spark:
+    name: Electric Spark
+    particle: ELECTRIC_SPARK
+    settings:
+      offset: { x: 0.4, y: 0.2, z: 0.4 }
+  soul:
+    name: Soul Flame
+    particle: SOUL_FIRE_FLAME
+    settings:
+      offset: { x: 0.15, y: 0.1, z: 0.15 }
+  ehit:
+    name: Enchanted Hit
+    particle: ENCHANTED_HIT
+    velocity-trail: true
+    settings:
+      offset: { x: 0.2, y: 0.1, z: 0.2 }
+  crit:
+    name: Crit
+    particle: CRIT
+    velocity-trail: true
+    settings:
+      offset: { x: 0.2, y: 0.1, z: 0.2 }
+  ash:
+    name: Ash
+    particle: ASH
+    settings:
+      offset: { x: 0.1, y: 0.1, z: 0.1 }
+      speed: 1.0
+  dragon:
+    name: Dragon Breath
+    particle: DRAGON_BREATH
+    data: 0.5
+    settings:
+      offset: { x: 0.0, y: -0.5, z: 0.0 }
+      speed: 0.05
+  end:
+    name: End Rod
+    particle: END_ROD
+    settings:
+      offset: { x: 0.12, y: 0.06, z: 0.12 }
+  cherry:
+    name: Cherry Blossom
+    particle: CHERRY_LEAVES
+    settings:
+      offset: { x: 0.35, y: 0.15, z: 0.35 }
+  enderman:
+    name: "Enderman's Aura"
+    particle: PORTAL
+    settings:
+      offset: { x: 0.1, y: 0.1, z: 0.1 }
+      speed: 0.15
+  revender:
+    name: Revender
+    particle: REVERSE_PORTAL
+    settings:
+      offset: { x: 0.1, y: 0.1, z: 0.1 }
+      speed: 0.15

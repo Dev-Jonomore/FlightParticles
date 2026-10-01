@@ -1,86 +1,72 @@
 package mc.jonomore.flightParticles;
 
-import com.google.gson.Gson;
+import org.bukkit.Color;
 
 /**
- * Stores all configurable parameters for a single particle type's flight trail.
- * Serialised as JSON and stored in the player's PersistentDataContainer.
+ * Every tunable value for one particle.
+ *
+ * <p>The canonical constructor clamps, so an out-of-range instance cannot exist.
+ * That is deliberate: dialog responses, persisted values, and legacy data all
+ * funnel through here, and none of them are trustworthy on their own.
  */
-public class ParticleSettings {
+public record ParticleSettings(
+    double offsetX, double offsetY, double offsetZ,
+    int count,
+    float speed,
+    int rgb,
+    float size) {
 
-  private static final Gson GSON = new Gson();
+  public static final double OFFSET_MIN = -2.0;
+  public static final double OFFSET_MAX = 2.0;
+  public static final float OFFSET_STEP = 0.05f;
 
-  // ── Shared ──────────────────────────────────────────────────────────────
-  public double offsetX;
-  public double offsetY;
-  public double offsetZ;
-  public int    count;
-  public double extra;     // speed / "extra" parameter
+  // Zero is not "no particles" -- it switches offset from a spread radius to a
+  // direction vector and speed from drift to launch velocity.
+  public static final int COUNT_MIN = 0;
+  public static final int COUNT_MAX = 8;
 
-  // ── DUST-only ───────────────────────────────────────────────────────────
-  public int   red;
-  public int   green;
-  public int   blue;
-  public float size;
+  public static final float SPEED_MIN = 0.0f;
+  public static final float SPEED_MAX = 2.0f;
+  public static final float SPEED_STEP = 0.05f;
 
-  // ── CRIT / ENCHANTED_HIT ────────────────────────────────────────────────
-  public boolean useVelocityOffset;
-  public double  velocityMultiplier;
+  public static final float SIZE_MIN = 0.1f;
+  public static final float SIZE_MAX = 4.0f;
+  public static final float SIZE_STEP = 0.1f;
 
-  // ── DRAGON_BREATH ────────────────────────────────────────────────────────
-  public float dataValue;
+  // Carried by every non-Dust type so the record stays a single shape; never read.
+  private static final int INERT_RGB = 0xFFFFFF;
+  private static final float INERT_SIZE = 1.0f;
 
-  // ── Serialization ────────────────────────────────────────────────────────
-
-  public String toJson() {
-    return GSON.toJson(this);
+  public ParticleSettings {
+    offsetX = clamp(offsetX, OFFSET_MIN, OFFSET_MAX);
+    offsetY = clamp(offsetY, OFFSET_MIN, OFFSET_MAX);
+    offsetZ = clamp(offsetZ, OFFSET_MIN, OFFSET_MAX);
+    count = (int) clamp(count, COUNT_MIN, COUNT_MAX);
+    speed = (float) clamp(speed, SPEED_MIN, SPEED_MAX);
+    rgb = rgb & 0xFFFFFF;
+    size = (float) clamp(size, SIZE_MIN, SIZE_MAX);
   }
 
-  public static ParticleSettings fromJson(String json) {
-    return GSON.fromJson(json, ParticleSettings.class);
+  /** Settings for a particle that carries no data object -- everything except Dust. */
+  public static ParticleSettings of(double offsetX, double offsetY, double offsetZ, int count, float speed) {
+    return new ParticleSettings(offsetX, offsetY, offsetZ, count, speed, INERT_RGB, INERT_SIZE);
   }
 
-  // ── Defaults (mirrors the original hardcoded switch statement) ───────────
+  /** Settings for Dust, the only type with a color and size. */
+  public static ParticleSettings dust(
+      double offsetX, double offsetY, double offsetZ, int count, float speed, int rgb, float size) {
+    return new ParticleSettings(offsetX, offsetY, offsetZ, count, speed, rgb, size);
+  }
 
-  public static ParticleSettings createDefault(FlightParticleType type) {
-    ParticleSettings s = new ParticleSettings();
-    switch (type) {
-      case DUST -> {
-        s.red = 110; s.green = 41; s.blue = 112; // PLUM_COLOR
-        s.size    = 1.2f;
-        s.offsetX = 0.2; s.offsetY = 0.0; s.offsetZ = 0.2;
-        s.count   = 0;
-        s.extra   = 0.0;
-      }
-      case FLAME, SOUL_FLAME -> {
-        s.offsetX = 0.15; s.offsetY = 0.1; s.offsetZ = 0.15;
-        s.count   = 1;
-        s.extra   = 0.0;
-      }
-      case SPARK -> {
-        s.offsetX = 0.4; s.offsetY = 0.2; s.offsetZ = 0.4;
-        s.count   = 1;
-        s.extra   = 0.0;
-      }
-      case ASH -> {
-        s.offsetX = 0.1; s.offsetY = 0.1; s.offsetZ = 0.1;
-        s.count   = 1;
-        s.extra   = 0.0;
-      }
-      case CRIT, ENCHANTED_HIT -> {
-        s.useVelocityOffset  = true;
-        s.velocityMultiplier = 1.0;
-        s.offsetX = 0.0; s.offsetY = 0.0; s.offsetZ = 0.0;
-        s.count   = 0;
-        s.extra   = 0.0;
-      }
-      case DRAGON_BREATH -> {
-        s.offsetX  = 0.0; s.offsetY = -0.5; s.offsetZ = 0.0;
-        s.count    = 0;
-        s.extra    = 0.0;
-        s.dataValue = 0.5f;
-      }
+  public Color color() {
+    return Color.fromRGB(rgb);
+  }
+
+  /** NaN folds to the minimum -- a modified client can put one in any float field. */
+  private static double clamp(double value, double min, double max) {
+    if (Double.isNaN(value)) {
+      return min;
     }
-    return s;
+    return Math.min(max, Math.max(min, value));
   }
 }

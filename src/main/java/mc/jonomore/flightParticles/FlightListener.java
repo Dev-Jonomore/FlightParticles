@@ -31,6 +31,8 @@ public final class FlightListener implements Listener {
   @EventHandler
   public void onPlayerJoin(PlayerJoinEvent event) {
     plugin.applyFlightPermission(event.getPlayer());
+    // Cheap no-op for anyone already on the container format.
+    plugin.storage().migrate(event.getPlayer());
   }
 
   @EventHandler(priority = EventPriority.MONITOR)

@@ -15,7 +15,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Vector;
 
 public final class FlightParticles extends JavaPlugin {
@@ -23,11 +22,10 @@ public final class FlightParticles extends JavaPlugin {
   public static final String FLIGHT_PERMISSION = "lobby.flight";
   public static final String FLIGHT_COMMAND_PERMISSION = "flight.command";
   public static final String RESET_ALL_PERMISSION = "flight.command.resetall";
+  public static final String SETTINGS_PERMISSION = "flight.settings";
 
-  private static final UUID NIT1KING = UUID.fromString("b96e4a52-a359-4f33-8a81-bc6236f321b8");
-  private static final Color PLUM_COLOR = Color.fromRGB(110, 41, 112);
-
-  private final NamespacedKey particleKey = new NamespacedKey(this, "flight_particle");
+  private final ParticleStorage storage = new ParticleStorage(this);
+  private ParticleRegistry particles;
   private final Set<UUID> flyingPlayers = ConcurrentHashMap.newKeySet();
   private BukkitTask globalTask = null;
 
@@ -48,8 +46,18 @@ public final class FlightParticles extends JavaPlugin {
 
   @Override
   public void onEnable() {
+    saveDefaultConfig();
+    particles = ParticleRegistry.load(this);
     getServer().getPluginManager().registerEvents(new FlightListener(this), this);
     subscribeToPermissionChanges();
+  }
+
+  public ParticleStorage storage() {
+    return storage;
+  }
+
+  public ParticleRegistry particles() {
+    return particles;
   }
 
   /** Syncs allowFlight with {@link #FLIGHT_PERMISSION}; creative and spectator manage flight themselves. */
@@ -95,44 +103,52 @@ public final class FlightParticles extends JavaPlugin {
     }
   }
 
+  /**
+   * The selection as it will actually render. A stored type the player may no
+   * longer use falls back to Dust, and custom settings fall back to defaults
+   * without being deleted -- a temporary rank lapse should not cost someone
+   * their tuning.
+   */
+  ParticleStorage.Selection getEffectiveSelection(Player player) {
+    ParticleStorage.Selection selection = storage.getSelection(player);
+    FlightParticleType type = selection.type().isAllowed(player) ? selection.type() : particles.defaultType();
+    boolean custom = selection.custom()
+        && type == selection.type()
+        && player.hasPermission(SETTINGS_PERMISSION);
+    return selection.withType(type).withCustom(custom);
+  }
+
   FlightParticleType getPlayerParticleType(Player player) {
-    FlightParticleType type = getStoredParticleType(player);
-    // A stored type the player no longer has permission for is not honored.
-    return type != null && type.isAllowed(player) ? type : FlightParticleType.DUST;
+    return getEffectiveSelection(player).type();
   }
 
   void setPlayerParticleType(Player player, FlightParticleType type) {
-    player.getPersistentDataContainer().set(particleKey, PersistentDataType.STRING, type.literal());
+    storage.selectPreset(player, type);
   }
 
   /** Clears the stored particle of every online player who may no longer use it, returning the count. */
   int resetUnpermittedParticles() {
     int reset = 0;
     for (Player player : Bukkit.getOnlinePlayers()) {
-      if (!player.getPersistentDataContainer().has(particleKey, PersistentDataType.STRING)) {
+      if (storage.getSelection(player).type().isAllowed(player)) {
         continue;
       }
-      FlightParticleType type = getStoredParticleType(player);
-      if (type != null && type.isAllowed(player)) {
-        continue;
-      }
-      player.getPersistentDataContainer().remove(particleKey);
+      // Only the selection is walked back; saved settings survive.
+      storage.selectPreset(player, particles.defaultType());
       reset++;
     }
     return reset;
   }
 
-  /** The persisted particle, or null when absent or no longer a known type. */
-  private FlightParticleType getStoredParticleType(Player player) {
-    String literal = player.getPersistentDataContainer().get(particleKey, PersistentDataType.STRING);
-    if (literal == null) {
-      return null;
+  /** Rewrites every online player still on the pre-container format, returning the count. */
+  int migrateLegacyParticles() {
+    int migrated = 0;
+    for (Player player : Bukkit.getOnlinePlayers()) {
+      if (storage.migrate(player)) {
+        migrated++;
+      }
     }
-    try {
-      return FlightParticleType.fromLiteral(literal);
-    } catch (IllegalArgumentException _) {
-      return null;
-    }
+    return migrated;
   }
 
   /**
@@ -159,44 +175,53 @@ public final class FlightParticles extends JavaPlugin {
           continue;
         }
 
-        spawnFlightTrail(player, getPlayerParticleType(player));
+        ParticleStorage.Selection selection = getEffectiveSelection(player);
+        if (!selection.enabled()) {
+          continue;
+        }
+
+        spawnFlightTrail(player, selection.type(), selection.custom());
       }
       stopGlobalTaskIfEmpty();
     }, 0L, 2L);
   }
 
-  private void spawnFlightTrail(Player player, FlightParticleType type) {
+  private void spawnFlightTrail(Player player, FlightParticleType type, boolean custom) {
     Location location = player.getLocation().add(0, 0.1, 0);
     ParticleBuilder builder = type.particle().builder().location(location).receivers(32, true);
 
-    switch (type) {
-      case DUST -> builder
-          .color(player.getUniqueId().equals(NIT1KING) ? Color.ORANGE : PLUM_COLOR, 1.2f)
-          .offset(0.2, 0.0, 0.2);
-      case FLAME, SOUL_FLAME -> builder
-          .offset(0.15, 0.1, 0.15)
-          .count(1)
-          .extra(0.0);
-      case SPARK -> builder
-          .offset(0.4, 0.2, 0.4)
-          .count(1)
-          .extra(0.0);
-      case ASH -> builder
-          .offset(0.1, 0.1, 0.1)
-          .count(1);
-      case CRIT, ENCHANTED_HIT -> {
-        Vector velocity = player.getVelocity().clone().multiply(-1);
-        builder
-          .offset(velocity.getX(), -0.1, velocity.getZ())
-          .count(0);
-      }
-      case DRAGON_BREATH -> builder
-        .offset(0.0, -0.5, 0.0)
-        .count(0)
-        .data(0.5f);
+    if (!custom && type.hasDynamicDefault()) {
+      applyDynamicDefault(player, type, builder);
+    } else {
+      applySettings(type, custom ? storage.getSettings(player, type) : type.defaultSettings(), builder);
     }
 
     builder.spawn();
+  }
+
+  /**
+   * The defaults that cannot come from sliders, because they are recomputed from
+   * the player's velocity every tick.
+   */
+  private void applyDynamicDefault(Player player, FlightParticleType type, ParticleBuilder builder) {
+    Vector velocity = player.getVelocity().clone().multiply(-1);
+    builder
+      .offset(velocity.getX(), -0.1, velocity.getZ())
+      .count(0);
+  }
+
+  private static void applySettings(FlightParticleType type, ParticleSettings settings, ParticleBuilder builder) {
+    builder
+      .offset(settings.offsetX(), settings.offsetY(), settings.offsetZ())
+      .count(settings.count())
+      .extra(settings.speed());
+
+    if (type.hasColor()) {
+      builder.color(settings.color(), settings.size());
+    } else if (type.data() != null) {
+      // A fixed characteristic of this trail rather than a tunable, so both modes get it.
+      builder.data(type.data());
+    }
   }
 
   /**

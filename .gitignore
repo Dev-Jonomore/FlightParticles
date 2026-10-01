@@ -22,3 +22,5 @@ run
 
 # VSCode
 .vscode/
+# Internal session notes
+/STATE.md

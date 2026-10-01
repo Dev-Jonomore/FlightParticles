@@ -11,6 +11,7 @@ import net.strokkur.commands.paper.Executor;
 import net.strokkur.commands.permission.Permission;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -28,20 +29,12 @@ public final class FlightParticleCommand {
 
   @Executes
   void showCurrent(@Executor Player player) {
-    FlightParticleType type = plugin.getPlayerParticleType(player);
-    StringBuilder options = new StringBuilder();
-    for (FlightParticleType pType : FlightParticleType.allowedFor(player)) {
-      options.append(", ").append(pType.literal());
-    }
-    player.sendRichMessage(
-      "<dark_purple>Your flight trail particle: <b><type></b>. Options: <yellow>dust<options>",
-      Placeholder.unparsed("type", type.displayName()),
-      Placeholder.unparsed("options", options.toString()));
+    ParticleMenuDialog.show(plugin, player);
   }
 
   @ParticleSuggestions
   public static CompletableFuture<Suggestions> provide(CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
-    FlightParticleType.allowedFor(ctx.getSource().getSender()).stream()
+    JavaPlugin.getPlugin(FlightParticles.class).particles().allowedFor(ctx.getSource().getSender()).stream()
       .map(FlightParticleType::literal)
       .forEach(builder::suggest);
     return builder.buildFuture();
@@ -49,7 +42,7 @@ public final class FlightParticleCommand {
 
   @Executes("set")
   void setParticle(@Executor Player player, @ParticleSuggestions String particle) {
-    FlightParticleType type = FlightParticleType.fromLiteral(particle);
+    FlightParticleType type = plugin.particles().get(particle);
     if (type == null || !type.isAllowed(player)) {
       player.sendRichMessage("<red>This particle is locked!");
       return;
@@ -60,12 +53,42 @@ public final class FlightParticleCommand {
         Placeholder.unparsed("type", type.displayName()));
   }
 
+  /** Direct entry into one particle's customizer, bypassing the menu. */
+  @Executes("customize")
+  void customizeParticle(@Executor Player player, @ParticleSuggestions String particle) {
+    FlightParticleType type = plugin.particles().get(particle);
+    if (type == null) {
+      player.sendRichMessage("<red>Unknown particle.");
+      return;
+    }
+    if (!type.isAllowed(player)) {
+      player.sendRichMessage("<red>This particle is locked!");
+      return;
+    }
+    if (!player.hasPermission(FlightParticles.SETTINGS_PERMISSION)) {
+      player.sendRichMessage("<red>You don't have access to custom particle settings.");
+      return;
+    }
+    // Reached without the menu, so backing out just closes.
+    ParticleDialogs.openSettings(plugin, player, type, _ -> {});
+  }
+
+  /** Join already migrates; this is for the players who were online when the plugin updated. */
+  @Executes("migrate")
+  @Permission(FlightParticles.RESET_ALL_PERMISSION)
+  void migrateAll(CommandSender sender) {
+    int migrated = plugin.migrateLegacyParticles();
+    sender.sendRichMessage(
+      "<green>Migrated <yellow><count><green> online player(s) to the new particle format.",
+      Placeholder.unparsed("count", String.valueOf(migrated)));
+  }
+
   @Subcommand("reset")
   class ResetSub {
 
     @Executes
     void resetParticle(@Executor Player player) {
-      FlightParticleType type = FlightParticleType.fromLiteral("dust");
+      FlightParticleType type = plugin.particles().defaultType();
       plugin.setPlayerParticleType(player, type);
       player.sendRichMessage(
         "<green>Flight trail particle set to <dark_purple><b><type><green>!",
