@@ -4,14 +4,14 @@ prefix: Fly
 version: '${version}'
 
 main: mc.jonomore.flightParticles.FlightParticles
-api-version: '26.1.2'
+api-version: '26.3'
 load: POSTWORLD
 softdepend: [ LuckPerms ]
 
 authors: [ Jonomore ]
 
 # Bukkit treats undeclared permissions as PermissionDefault.OP, so every node
-# below keeps `op` to preserve current behaviour. Flip the cosmetic ones to
+# below keeps `op` to preserve current behavior. Flip the cosmetic ones to
 # `false` if ops should not implicitly own every particle.
 permissions:
   lobby.flight:
@@ -26,46 +26,9 @@ permissions:
   flight.settings:
     description: Allows tuning a particle's settings instead of using its defaults.
     default: op
-  flight.particle.flame:
-    description: Use the Flame flight trail.
-    default: op
-  flight.particle.spark:
-    description: Use the Electric Spark flight trail.
-    default: op
-  flight.particle.soul:
-    description: Use the Soul Flame flight trail.
-    default: op
-  flight.particle.ehit:
-    description: Use the Enchanted Hit flight trail.
-    default: op
-  flight.particle.crit:
-    description: Use the Crit flight trail.
-    default: op
-  flight.particle.ash:
-    description: Use the Ash flight trail.
-    default: op
-  flight.particle.dragon:
-    description: Use the Dragon Breath flight trail.
-    default: op
-  flight.particle.end:
-    description: Use the End Rod flight trail.
-    default: op
-  flight.particle.cherry:
-    description: Use the Cherry Blossom flight trail.
-    default: op
   flight.particle.*:
-    description: Use every flight trail particle. Dust needs no permission.
+    description: Use every flight trail particle. Each particle's node is registered from config.yml.
     default: op
-    children:
-      flight.particle.flame: true
-      flight.particle.spark: true
-      flight.particle.soul: true
-      flight.particle.ehit: true
-      flight.particle.crit: true
-      flight.particle.ash: true
-      flight.particle.dragon: true
-      flight.particle.end: true
-      flight.particle.cherry: true
   flight.*:
     description: Full access to FlightParticles.
     default: op
