@@ -20,8 +20,8 @@ public final class FlyCommand {
     } else if (player.getAllowFlight()) {
       player.setAllowFlight(false);
     } else if (player.hasPermission("lobby.flight")) {
-      player.setFlying(true);
       player.setAllowFlight(true);
+      player.setFlying(true);
     }
   }
 

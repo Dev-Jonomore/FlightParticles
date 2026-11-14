@@ -44,7 +44,7 @@ public final class FlightParticleCommand {
   void setParticle(@Executor Player player, @ParticleSuggestions String particle) {
     FlightParticleType type = plugin.particles().get(particle);
     if (type == null || !type.isAllowed(player)) {
-      player.sendRichMessage("<red>This particle is locked!");
+      plugin.sendLocked(player);
       return;
     }
     plugin.setPlayerParticleType(player, type);
@@ -62,7 +62,7 @@ public final class FlightParticleCommand {
       return;
     }
     if (!type.isAllowed(player)) {
-      player.sendRichMessage("<red>This particle is locked!");
+      plugin.sendLocked(player);
       return;
     }
     if (!player.hasPermission(FlightParticles.SETTINGS_PERMISSION)) {

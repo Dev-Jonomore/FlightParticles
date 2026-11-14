@@ -25,6 +25,12 @@
 # It never needs a permission.
 default-particle: dust
 
+# Tells players where to unlock a particle they don't have. Plain text, shown
+# after "This particle is locked!" in chat and in the menu tooltip. Particles
+# are sold on the Flight Particles page of the coin shop, which grants each
+# one's permission on purchase.
+locked-hint: "Buy it in the coin shop with /coins."
+
 particles:
   dust:
     name: Dust

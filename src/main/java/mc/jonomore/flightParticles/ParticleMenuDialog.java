@@ -113,7 +113,7 @@ public final class ParticleMenuDialog {
 
     Component tooltip = Component.text(allowed
       ? (hasCustom ? "Use this particle. The * means you have tuned it." : "Use this particle.")
-      : "You haven't unlocked this particle.");
+      : "You haven't unlocked this particle. " + plugin.lockedHint());
 
     return ActionButton.builder(label)
       .tooltip(tooltip)
@@ -129,7 +129,7 @@ public final class ParticleMenuDialog {
 
     // The button being visible is not authorization; permissions can change while a dialog is open.
     if (!type.isAllowed(p)) {
-      p.sendRichMessage("<red>This particle is locked!");
+      plugin.sendLocked(p);
       reopen(plugin, p);
       return;
     }
@@ -148,7 +148,7 @@ public final class ParticleMenuDialog {
   /** Custom hands off to the tuning screen, which saves on accept; a preset applies immediately. */
   private static void choose(FlightParticles plugin, Player p, FlightParticleType type, boolean custom) {
     if (!type.isAllowed(p)) {
-      p.sendRichMessage("<red>This particle is locked!");
+      plugin.sendLocked(p);
       reopen(plugin, p);
       return;
     }

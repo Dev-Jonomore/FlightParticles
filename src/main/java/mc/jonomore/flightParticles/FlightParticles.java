@@ -3,6 +3,7 @@ package mc.jonomore.flightParticles;
 import com.destroystokyo.paper.ParticleBuilder;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.event.user.UserDataRecalculateEvent;
 import org.bukkit.*;
@@ -58,6 +59,16 @@ public final class FlightParticles extends JavaPlugin {
 
   public ParticleRegistry particles() {
     return particles;
+  }
+
+  /** Where a locked particle is unlocked; plain text, shown in the menu tooltip and in chat. */
+  String lockedHint() {
+    return getConfig().getString("locked-hint", "Buy it in the coin shop with /coins.");
+  }
+
+  void sendLocked(Player player) {
+    player.sendRichMessage("<red>This particle is locked! <gray><hint>",
+        Placeholder.unparsed("hint", lockedHint()));
   }
 
   /** Syncs allowFlight with {@link #FLIGHT_PERMISSION}; creative and spectator manage flight themselves. */
