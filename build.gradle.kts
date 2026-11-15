@@ -34,6 +34,8 @@ tasks {
 
     processResources {
         val props = mapOf("version" to version, "description" to project.description)
+        // Declared as inputs so a changed version or description re-expands plugin.yml
+        inputs.properties(props)
         filesMatching("plugin.yml") {
             expand(props)
         }
